@@ -1,6 +1,23 @@
 import sys, os, re
-import pymongo
 import datetime, iso8601
+from cassandra.cluster import Cluster
+from cassandra.policies import RoundRobinPolicy
+
+CASSANDRA_HOST = os.environ.get("CASSANDRA_HOST", "localhost")
+CASSANDRA_PORT = int(os.environ.get("CASSANDRA_PORT", 9042))
+
+_cassandra_session = None
+
+def get_cassandra_session():
+    global _cassandra_session
+    if _cassandra_session is None:
+        cluster = Cluster(
+            [CASSANDRA_HOST],
+            port=CASSANDRA_PORT,
+            load_balancing_policy=RoundRobinPolicy()
+        )
+        _cassandra_session = cluster.connect("agile_data_science")
+    return _cassandra_session
 
 def process_search(results):
   """Process elasticsearch hits and return flights records"""
@@ -31,14 +48,16 @@ def strip_place(url):
     return url
   return p
 
-def get_flight_distance(client, origin, dest):
-  """Get the distance between a pair of airport codes"""
-  query = {
-    "Origin": origin,
-    "Dest": dest,
-  }
-  record = client.agile_data_science.origin_dest_distances.find_one(query)
-  return record["Distance"]
+def get_flight_distance(origin, dest):
+  """Get the distance between a pair of airport codes from Cassandra"""
+  session = get_cassandra_session()
+  row = session.execute(
+    "SELECT distance FROM origin_dest_distances WHERE origin=%s AND dest=%s",
+    (origin, dest)
+  ).one()
+  if row is None:
+    raise ValueError("No distance found for route {} -> {}".format(origin, dest))
+  return row.distance
 
 def get_regression_date_args(iso_date):
   """Given an ISO Date, return the day of year, day of month, day of week as the API expects them."""

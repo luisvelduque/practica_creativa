@@ -1,0 +1,6 @@
+[0m[[0m[31merror[0m] [0m[0m/home/lenovo-legion/practica_creativa/flight_prediction/src/main/scala/es/upm/dit/ging/predictor/MakePrediction.scala:145:29: type mismatch;[0m
+[0m[[0m[31merror[0m] [0m[0m found   : org.apache.spark.sql.types.StructField[0m
+[0m[[0m[31merror[0m] [0m[0m required: org.apache.spark.sql.Column[0m
+[0m[[0m[31merror[0m] [0m[0m      .select(to_json(struct("*")).as("value"))[0m
+[0m[[0m[31merror[0m] [0m[0m                            ^[0m
+[0m[[0m[31merror[0m] [0m[0mone error found[0m

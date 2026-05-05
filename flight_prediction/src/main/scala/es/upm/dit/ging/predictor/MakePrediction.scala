@@ -5,6 +5,10 @@ import org.apache.spark.ml.feature.{Bucketizer, StringIndexerModel, VectorAssemb
 import org.apache.spark.sql.functions.{concat, from_json, lit}
 import org.apache.spark.sql.types.{DataTypes, StructType}
 import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.functions.to_json
+import org.apache.spark.sql.functions.struct
+import com.datastax.spark.connector.streaming._
+
 
 object MakePrediction {
 
@@ -136,25 +140,39 @@ object MakePrediction {
     // Inspect the output
     finalPredictions.printSchema()
 
-    // define a streaming query
-    val dataStreamWriter = finalPredictions
+    // Escribir en Kafka
+    val kafkaOutput = finalPredictions
+      .select(to_json(org.apache.spark.sql.functions.struct(finalPredictions.columns.map(finalPredictions(_)): _*)).as("value"))
       .writeStream
-      .format("mongodb")
-      .option("spark.mongodb.connection.uri", "mongodb://127.0.0.1:27017")
-      .option("spark.mongodb.database", "agile_data_science")
-      .option("checkpointLocation", "/tmp")
-      .option("spark.mongodb.collection", "flight_delay_ml_response")
+      .format("kafka")
+      .option("kafka.bootstrap.servers", "localhost:9092")
+      .option("topic", "flight-delay-ml-response")
+      .option("checkpointLocation", "/tmp/kafka-checkpoint")
       .outputMode("append")
-
-    // run the query
-    val query = dataStreamWriter.start()
-    // Console Output for predictions
-
-    val consoleOutput = finalPredictions.writeStream
-      .outputMode("append")
-      .format("console")
       .start()
-    consoleOutput.awaitTermination()
+
+    // Escribir en Cassandra
+
+    val cassandraOutput = finalPredictions
+      .select(
+        finalPredictions("UUID").as("uuid"),
+        finalPredictions("Origin").as("origin"),
+        finalPredictions("Dest").as("dest"),
+        finalPredictions("Carrier").as("carrier"),
+        finalPredictions("DepDelay").as("depdelay"),
+        finalPredictions("Prediction").as("prediction"),
+        finalPredictions("Timestamp").as("timestamp")
+      )
+      .writeStream
+      .format("org.apache.spark.sql.cassandra")
+      .option("keyspace", "agile_data_science")
+      .option("table", "flight_delay_ml_response")
+      .option("checkpointLocation", "/tmp/cassandra-checkpoint")
+      .outputMode("append")
+      .start()
+
+    kafkaOutput.awaitTermination()
+    cassandraOutput.awaitTermination()
   }
 
 }

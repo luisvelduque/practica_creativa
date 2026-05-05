@@ -23,8 +23,25 @@ def main(base_path):
     import pyspark
     import pyspark.sql
     
-    sc = pyspark.SparkContext()
-    spark = pyspark.sql.SparkSession(sc).builder.appName(APP_NAME).getOrCreate()
+    spark = pyspark.sql.SparkSession.builder \
+        .appName(APP_NAME) \
+        .config("spark.jars.packages",
+                "org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.5.0,"
+                "org.apache.hadoop:hadoop-aws:3.3.4") \
+        .config("spark.sql.extensions",
+                "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions") \
+        .config("spark.sql.catalog.lakehouse",
+                "org.apache.iceberg.spark.SparkCatalog") \
+        .config("spark.sql.catalog.lakehouse.type", "hadoop") \
+        .config("spark.sql.catalog.lakehouse.warehouse", "s3a://lakehouse/") \
+        .config("spark.hadoop.fs.s3a.endpoint", "http://localhost:9000") \
+        .config("spark.hadoop.fs.s3a.access.key", "minioadmin") \
+        .config("spark.hadoop.fs.s3a.secret.key", "minioadmin") \
+        .config("spark.hadoop.fs.s3a.path.style.access", "true") \
+        .config("spark.hadoop.fs.s3a.impl",
+                "org.apache.hadoop.fs.s3a.S3AFileSystem") \
+        .getOrCreate()
+
   
   #
   # {
@@ -53,10 +70,7 @@ def main(base_path):
     StructField("Origin", StringType(), True),      # "Origin":"TUS"
   ])
   
-  input_path = "{}/data/simple_flight_delay_features.jsonl.bz2".format(
-    base_path
-  )
-  features = spark.read.json(input_path, schema=schema)
+  features = spark.read.format("iceberg").load("s3a://lakehouse/flights")
   features.first()
   
   #
@@ -94,7 +108,7 @@ def main(base_path):
   )
   
   # Save the bucketizer
-  arrival_bucketizer_path = "{}/models/arrival_bucketizer_2.0.bin".format(base_path)
+  arrival_bucketizer_path = "s3a://lakehouse/models/arrival_bucketizer_2.0.bin"
   arrival_bucketizer.write().overwrite().save(arrival_bucketizer_path)
   
   # Apply the bucketizer
@@ -120,10 +134,8 @@ def main(base_path):
     ml_bucketized_features = ml_bucketized_features.drop(column)
     
     # Save the pipeline model
-    string_indexer_output_path = "{}/models/string_indexer_model_{}.bin".format(
-      base_path,
-      column
-    )
+    string_indexer_output_path = "s3a://lakehouse/models/string_indexer_model_{}.bin".format(column)
+
     string_indexer_model.write().overwrite().save(string_indexer_output_path)
   
   # Combine continuous, numeric fields with indexes of nominal ones
@@ -141,7 +153,7 @@ def main(base_path):
   final_vectorized_features = vector_assembler.transform(ml_bucketized_features)
   
   # Save the numeric vector assembler
-  vector_assembler_path = "{}/models/numeric_vector_assembler.bin".format(base_path)
+  vector_assembler_path = "s3a://lakehouse/models/numeric_vector_assembler_2.0.bin"
   vector_assembler.write().overwrite().save(vector_assembler_path)
   
   # Drop the index columns
@@ -163,9 +175,7 @@ def main(base_path):
   model = rfc.fit(final_vectorized_features)
   
   # Save the new model over the old one
-  model_output_path = "{}/models/spark_random_forest_classifier.flight_delays.5.0.bin".format(
-    base_path
-  )
+  model_output_path = "s3a://lakehouse/models/spark_random_forest_classifier_2.0.bin"
   model.write().overwrite().save(model_output_path)
   
   # Evaluate model using test data

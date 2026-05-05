@@ -2,6 +2,7 @@ import sys, os, re
 from flask import Flask, render_template, request
 from pymongo import MongoClient
 from bson import json_util
+from flask_socketio import SocketIO, emit
 
 # Configuration details
 import config
@@ -11,6 +12,8 @@ import predict_utils
 
 # Set up Flask, Mongo and Elasticsearch
 app = Flask(__name__)
+app.config['SECRET_KEY'] = 'flight-delay-secret'
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 client = MongoClient()
 
@@ -18,17 +21,37 @@ from pyelasticsearch import ElasticSearch
 elastic = ElasticSearch(config.ELASTIC_URL)
 
 import json
+import threading
 
 # Date/time stuff
 import iso8601
 import datetime
 
 # Setup Kafka
-from kafka import KafkaProducer
+from kafka import KafkaProducer, KafkaConsumer
 producer = KafkaProducer(bootstrap_servers=['localhost:9092'],api_version=(0,10))
 PREDICTION_TOPIC = 'flight-delay-ml-request'
+RESPONSE_TOPIC = 'flight-delay-ml-response'
 
 import uuid
+
+# Background thread: consumes prediction results from Kafka and emits via WebSocket
+def kafka_consumer_thread():
+  consumer = KafkaConsumer(
+    RESPONSE_TOPIC,
+    bootstrap_servers=['localhost:9092'],
+    api_version=(0, 10),
+    value_deserializer=lambda m: json.loads(m.decode('utf-8'))
+  )
+  for message in consumer:
+    prediction = message.value
+    unique_id = prediction.get('UUID') or prediction.get('uuid')
+    if unique_id:
+      socketio.emit('prediction_result', prediction, room=unique_id)
+
+# Start the Kafka consumer thread when the app starts
+consumer_thread = threading.Thread(target=kafka_consumer_thread, daemon=True)
+consumer_thread.start()
 
 # Chapter 5 controller: Fetch a flight and display it
 @app.route("/on_time_performance")
@@ -325,7 +348,7 @@ def regress_flight_delays():
   prediction_features['FlightNum'] = api_form_values['FlightNum']
   
   # Set the derived values
-  prediction_features['Distance'] = predict_utils.get_flight_distance(client, api_form_values['Origin'], api_form_values['Dest'])
+  prediction_features['Distance'] = predict_utils.get_flight_distance(api_form_values['Origin'], api_form_values['Dest'])
   
   # Turn the date into DayOfYear, DayOfMonth, DayOfWeek
   date_features_dict = predict_utils.get_regression_date_args(api_form_values['FlightDate'])
@@ -382,7 +405,7 @@ def classify_flight_delays():
   
   # Set the derived values
   prediction_features['Distance'] = predict_utils.get_flight_distance(
-    client, api_form_values['Origin'],
+    api_form_values['Origin'],
     api_form_values['Dest']
   )
   
@@ -471,7 +494,7 @@ def classify_flight_delays_realtime():
   
   # Set the derived values
   prediction_features['Distance'] = predict_utils.get_flight_distance(
-    client, api_form_values['Origin'],
+    api_form_values['Origin'],
     api_form_values['Dest']
   )
   
@@ -497,7 +520,7 @@ def classify_flight_delays_realtime():
 
 @app.route("/flights/delays/predict_kafka")
 def flight_delays_page_kafka():
-  """Serves flight delay prediction page with polling form"""
+  """Serves flight delay prediction page with WebSocket support"""
   
   form_config = [
     {'field': 'DepDelay', 'label': 'Departure Delay', 'value': 5},
@@ -509,22 +532,13 @@ def flight_delays_page_kafka():
   
   return render_template('flight_delays_predict_kafka.html', form_config=form_config)
 
-@app.route("/flights/delays/predict/classify_realtime/response/<unique_id>")
-def classify_flight_delays_realtime_response(unique_id):
-  """Serves predictions to polling requestors"""
-  
-  prediction = client.agile_data_science.flight_delay_ml_response.find_one(
-    {
-      "UUID": unique_id
-    }
-  )
-  
-  response = {"status": "WAIT", "id": unique_id}
-  if prediction:
-    response["status"] = "OK"
-    response["prediction"] = prediction
-  
-  return json_util.dumps(response)
+# WebSocket event: client joins a room identified by its prediction UUID
+@socketio.on('subscribe')
+def on_subscribe(data):
+  from flask_socketio import join_room
+  unique_id = data.get('uuid')
+  if unique_id:
+    join_room(unique_id)
 
 def shutdown_server():
   func = request.environ.get('werkzeug.server.shutdown')
@@ -538,8 +552,9 @@ def shutdown():
   return 'Server shutting down...'
 
 if __name__ == "__main__":
-    app.run(
+  socketio.run(
+    app,
     debug=True,
     host='0.0.0.0',
-    port='5001'
+    port=5001
   )
