@@ -32,3 +32,9 @@ janusgraph
 deep
 data/origin_dest_distances.jsonl
 data/simple_flight_delay_features.jsonl.bz2
+
+# Pesa mucho el .jar
+flight_prediction/target/
+
+# Tampoco subir el entorno virtual
+venv/
