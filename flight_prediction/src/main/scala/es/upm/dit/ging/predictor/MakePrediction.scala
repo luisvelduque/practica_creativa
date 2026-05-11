@@ -19,11 +19,12 @@ object MakePrediction {
       .builder
       .appName("StructuredNetworkWordCount")
       .master("local[*]")
+      .config("spark.cassandra.connection.host", sys.env.getOrElse("CASSANDRA_HOST", "cassandra"))
       .getOrCreate()
     import spark.implicits._
 
     //Load the arrival delay bucketizer
-    val base_path= "/home/lenovo-legion/practica_creativa"
+    val base_path= sys.env.getOrElse("BASE_PATH", "/app")
     val arrivalBucketizerPath = "%s/models/arrival_bucketizer_2.0.bin".format(base_path)
     print(arrivalBucketizerPath.toString())
     val arrivalBucketizer = Bucketizer.load(arrivalBucketizerPath)
@@ -48,7 +49,7 @@ object MakePrediction {
     val df = spark
       .readStream
       .format("kafka")
-      .option("kafka.bootstrap.servers", "localhost:9092")
+      .option("kafka.bootstrap.servers", "kafka:9092")
       .option("subscribe", "flight-delay-ml-request")
       .load()
     df.printSchema()
@@ -145,7 +146,7 @@ object MakePrediction {
       .select(to_json(org.apache.spark.sql.functions.struct(finalPredictions.columns.map(finalPredictions(_)): _*)).as("value"))
       .writeStream
       .format("kafka")
-      .option("kafka.bootstrap.servers", "localhost:9092")
+      .option("kafka.bootstrap.servers", "kafka:9092")
       .option("topic", "flight-delay-ml-response")
       .option("checkpointLocation", "/tmp/kafka-checkpoint")
       .outputMode("append")

@@ -15,7 +15,7 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'flight-delay-secret'
 socketio = SocketIO(app, cors_allowed_origins="*")
 
-client = MongoClient()
+client = MongoClient(os.environ.get("MONGO_HOST", "localhost"), 27017)
 
 from pyelasticsearch import ElasticSearch
 elastic = ElasticSearch(config.ELASTIC_URL)
@@ -29,24 +29,31 @@ import datetime
 
 # Setup Kafka
 from kafka import KafkaProducer, KafkaConsumer
-producer = KafkaProducer(bootstrap_servers=['localhost:9092'],api_version=(0,10))
+producer = KafkaProducer(bootstrap_servers=['kafka:9092'],api_version=(3,8,0))
 PREDICTION_TOPIC = 'flight-delay-ml-request'
 RESPONSE_TOPIC = 'flight-delay-ml-response'
 
 import uuid
 
 # Background thread: consumes prediction results from Kafka and emits via WebSocket
+# Cache temporal de predicciones pendientes
+prediction_cache = {}
+
 def kafka_consumer_thread():
   consumer = KafkaConsumer(
     RESPONSE_TOPIC,
-    bootstrap_servers=['localhost:9092'],
-    api_version=(0, 10),
+    bootstrap_servers=['kafka:9092'],
+    api_version=(3, 8, 0),
     value_deserializer=lambda m: json.loads(m.decode('utf-8'))
   )
+  print("Kafka consumer thread started, listening on:", RESPONSE_TOPIC)
   for message in consumer:
     prediction = message.value
+    print("Received prediction from Kafka:", prediction)
     unique_id = prediction.get('UUID') or prediction.get('uuid')
     if unique_id:
+      prediction_cache[unique_id] = prediction
+      print("Emitting prediction for UUID:", unique_id)
       socketio.emit('prediction_result', prediction, room=unique_id)
 
 # Start the Kafka consumer thread when the app starts
@@ -514,6 +521,7 @@ def classify_flight_delays_realtime():
   
   message_bytes = json.dumps(prediction_features).encode()
   producer.send(PREDICTION_TOPIC, message_bytes)
+  producer.flush()
 
   response = {"status": "OK", "id": unique_id}
   return json_util.dumps(response)
@@ -539,6 +547,10 @@ def on_subscribe(data):
   unique_id = data.get('uuid')
   if unique_id:
     join_room(unique_id)
+    # Si la predicción ya llegó antes de que el cliente se suscribiera, enviarla ahora
+    if unique_id in prediction_cache:
+      print("Sending cached prediction for UUID:", unique_id)
+      emit('prediction_result', prediction_cache.pop(unique_id))
 
 def shutdown_server():
   func = request.environ.get('werkzeug.server.shutdown')
@@ -556,5 +568,6 @@ if __name__ == "__main__":
     app,
     debug=True,
     host='0.0.0.0',
-    port=5001
+    port=5001,
+    allow_unsafe_werkzeug=True
   )

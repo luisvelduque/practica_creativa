@@ -43,7 +43,7 @@ def get_navigation_offsets(offset1, offset2, increment):
 def strip_place(url):
   """Strip the existing start and end parameters from the query string"""
   try:
-    p = re.match('(.+)\?start=.+&end=.+', url).group(1)
+    p = re.match(r'(.+)\?start=.+&end=.+', url).group(1)
   except AttributeError as e:
     return url
   return p
