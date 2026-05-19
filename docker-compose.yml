@@ -117,6 +117,7 @@ services:
       volumes:
         - ./data:/app/data
         - ./models:/app/models
+        - ./resources:/app/resources
       healthcheck:
         test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
         interval: 30s

@@ -1,35 +1,56 @@
 {% extends "layout.html" %}
 {% block body %}
-  <!-- Navigation guide -->
-  / <a href="/flights/delays/predict_kafka">Flight Delay Prediction with Kafka</a>
+  <nav class="breadcrumb">
+    <a href="/">Dashboard</a> / <a href="/flights/delays/predict_kafka" class="active">Flight Delay Prediction with Kafka</a>
+  </nav>
 
-  <p class="lead" style="margin: 10px; margin-left: 0px;">
-    <!-- Airline Name and website-->
-    Predicting Flight Delays with Kafka
-  </p>
+  <header class="page-header">
+    <h1>Predicting Flight Delays with Kafka</h1>
+    <p class="subtitle">Real-time flight status classification and stream processing</p>
+  </header>
 
-  <!-- Generate form from search_config and request args -->
-  <form id="flight_delay_classification" action="/flights/delays/predict/classify_realtime" method="post">
-    {% for item in form_config %}
-      {% if 'label' in item %}
-        <label for="{{item['field']}}">{{item['label']}}</label>
-      {% else %}
-        <label for="{{item['field']}}">{{item['field']}}</label>
-      {% endif %}
-        <input name="{{item['field']}}" style="width: 36px; margin-right: 10px;" 
-        {% if 'value' in item %}
-          value="{{item['value']}}"
-        {% endif %}
-        ></input>
-    {% endfor %}
-    <button type="submit" class="btn btn-xs btn-default" style="height: 25px">Submit</button>
-  </form>
+  <div class="prediction-container">
+    
+    <form id="flight_delay_classification" class="modern-form" action="/flights/delays/predict/classify_realtime" method="post">
+      <div class="form-grid">
+        {% for item in form_config %}
+          <div class="form-group">
+            {% if 'label' in item %}
+              <label for="{{item['field']}}">{{item['label']}}</label>
+            {% else %}
+              <label for="{{item['field']}}">{{item['field']}}</label>
+            {% endif %}
+            <input 
+              id="{{item['field']}}" 
+              name="{{item['field']}}" 
+              placeholder="0"
+              {% if 'value' in item %} value="{{item['value']}}" {% endif %}
+            ></input>
+          </div>
+        {% endfor %}
+      </div>
+      
+      <div class="form-actions">
+        <button type="submit" class="btn-submit">
+          <span>Run Prediction</span>
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+        </button>
+      </div>
+    </form>
 
-  <div style="margin-top: 10px;">
-      <p>Delay: <span id="result" style="display: inline-block;"></span></p>
+    <div class="result-card">
+      <div class="result-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></nav>
+      </div>
+      <div class="result-content">
+        <h3>Prediction Output</h3>
+        <p class="result-text">Status: <span id="result" class="status-badge">Waiting for data...</span></p>
+      </div>
+    </div>
+
   </div>
 
-  <!-- Load Socket.IO and our form processing javascript -->
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
   <script src="/static/flight_delay_predict_polling.js"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='prediction.css') }}">
 {% endblock %}
