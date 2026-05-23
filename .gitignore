@@ -41,3 +41,6 @@ venv/
 
 # Variables de entorno con credenciales
 .env
+
+# k8s password
+k8s/secrets/
