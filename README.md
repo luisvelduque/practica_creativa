@@ -23,13 +23,16 @@ The first part of the project runs all services locally. The following tools are
 
 <div align="center">
   <img src="images/arquitectura.png" alt="Architecture"/>
-  <p><em>Figure 1: Architecture diagram created with <a href="https://app.diagrams.net/">Draw.io</a>Only valid for Part 1</em></p>
+  <p><em>Figure 1: Architecture diagram created with <a href="https://app.diagrams.net/">Draw.io</a>. [Only valid for Part 1]</em></p>
 </div>
 
 
+> [!WARNING]
+> **NOTE: This section is no longer maintained**
+
 ---
 
-## Part 2 — Docker Deployment
+## Part 2.1 — Docker Deployment (Mid Version - 6 First Points)
 
 The second part deploys the full architecture using Docker Compose. All services run in containers, so no local installation of Spark, Kafka, or MongoDB is required beyond Docker itself.
 
