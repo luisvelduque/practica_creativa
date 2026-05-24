@@ -1,0 +1,47 @@
+# Grafana con provisioning automático de datasource (Prometheus) y dashboards.
+# Los ConfigMaps de provisioning se montan como volúmenes para que Grafana
+# los cargue al arrancar sin configuración manual.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: flight-prediction
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      containers:
+        - name: grafana
+          image: grafana/grafana
+          ports:
+            - containerPort: 3000
+          env:
+            - name: GF_SECURITY_ADMIN_USER
+              value: "admin"
+            - name: GF_SECURITY_ADMIN_PASSWORD
+              value: "admin"
+          volumeMounts:
+            - name: grafana-provisioning
+              mountPath: /etc/grafana/provisioning
+            - name: grafana-dashboards
+              mountPath: /var/lib/grafana/dashboards
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "125m"
+            limits:
+              memory: "512Mi"
+              cpu: "250m"
+      volumes:
+        - name: grafana-provisioning
+          hostPath:
+            path: /grafana/provisioning
+        - name: grafana-dashboards
+          hostPath:
+            path: /grafana/dashboards
