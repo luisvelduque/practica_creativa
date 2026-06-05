@@ -32,7 +32,7 @@ The first part of the project runs all services locally. The following tools are
 
 ---
 
-## Part 2.1 — Docker Deployment (Mid Version - 6 First Points)
+## Part 2.1 — Docker Deployment
 
 The second part deploys the full architecture using Docker Compose. All services run in containers, so no local installation of Spark, Kafka, or MongoDB is required beyond Docker itself.
 
@@ -57,6 +57,9 @@ The second part deploys the full architecture using Docker Compose. All services
 | Grafana | grafana/grafana | latest |
 | Kafka Exporter | danielqsj/kafka-exporter | latest |
 | Cassandra Exporter | criteord/cassandra_exporter | latest |
+| MLflow | ghcr.io/mlflow/mlflow | 2.11.0 |
+| Apache Airflow | apache/airflow | 2.9.0 |
+| PostgreSQL (Airflow DB) | postgres | 15 |
 
 ### Architecture overview
 
@@ -73,6 +76,8 @@ The full pipeline works as follows:
 7. Flask receives the result via Kafka and pushes it to the browser using **WebSockets**
 8. **Prometheus** scrapes metrics from Flask, Kafka and Cassandra
 9. **Grafana** displays the metrics in a pre-provisioned dashboard
+10. **Airflow** triggers the training pipeline automatically every week
+11. **MLflow** tracks each training run, logging parameters, metrics and the model artifact
 
 ### Deployment steps
 
@@ -137,6 +142,6 @@ docker compose exec airflow-webserver airflow dags trigger flight_delay_training
 | MinIO Console | http://localhost:9001 | minioadmin / minioadmin |
 | Prometheus | http://localhost:9090 | — |
 | Grafana | http://localhost:3000 | admin / admin |
-|Airflow | http://localhost:8081  |admin / admin|
-|MLflow | http://localhost:5000|
+| Airflow | http://localhost:8081  |admin / admin|
+| MLflow | http://localhost:5000|
 
