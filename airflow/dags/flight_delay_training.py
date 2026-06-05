@@ -1,8 +1,6 @@
-import os
 from airflow import DAG
-from airflow.providers.docker.operators.docker import DockerOperator
+from airflow.operators.bash import BashOperator
 from datetime import datetime, timedelta
-from docker.types import Mount
 
 default_args = {
     'owner': 'airflow',
@@ -19,50 +17,14 @@ with DAG(
     catchup=False,
 ) as dag:
 
-    # Ejecuta ingest.py dentro del contenedor Flask que ya tiene PySpark y Java
-    ingest = DockerOperator(
+    ingest = BashOperator(
         task_id='ingest_data',
-        image='practica_creativa-flask',
-        command='python resources/ingest.py',
-        network_mode='practica_creativa_default',
-        auto_remove='success',
-        mount_tmp_dir=False,
-        docker_url='unix://var/run/docker.sock',
-        mounts=[
-            Mount(
-                source=os.environ.get('PROJECT_DATA_PATH', '/app/data'),
-                target='/app/data',
-                type='bind'
-            )
-        ],
-        environment={
-            'CASSANDRA_HOST': 'cassandra',
-            'KAFKA_HOST': 'kafka',
-            'MONGO_HOST': 'mongodb',
-            'MONGO_USER': 'admin',
-            'MONGO_PASSWORD': os.environ.get('MONGO_PASSWORD', ''),
-            'PROJECT_HOME': '/app',
-        },
+        bash_command='docker exec practica_creativa-flask-1 python resources/ingest.py',
     )
 
-    # Ejecuta train_spark_mllib_model.py dentro del contenedor Flask
-    train = DockerOperator(
+    train = BashOperator(
         task_id='train_model',
-        image='practica_creativa-flask',
-        command='python resources/train_spark_mllib_model.py .',
-        network_mode='practica_creativa_default',
-        auto_remove='success',
-        mount_tmp_dir=False,
-        docker_url='unix://var/run/docker.sock',
-        environment={
-            'CASSANDRA_HOST': 'cassandra',
-            'KAFKA_HOST': 'kafka',
-            'MONGO_HOST': 'mongodb',
-            'MONGO_USER': 'admin',
-            'MONGO_PASSWORD': os.environ.get('MONGO_PASSWORD', ''),
-            'PROJECT_HOME': '/app',
-            'MLFLOW_TRACKING_URI': 'http://mlflow:5000',
-        },
+        bash_command='docker exec practica_creativa-flask-1 python resources/train_spark_mllib_model.py .',
     )
 
     ingest >> train

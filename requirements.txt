@@ -27,3 +27,5 @@ joblib
 cassandra-driver
 flask-socketio
 prometheus-flask-exporter
+mlflow
+boto3

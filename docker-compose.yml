@@ -68,7 +68,7 @@ services:
       image: cassandra:4.1
       volumes:
         - ./resources/init_cassandra.cql:/init.cql
-      command: > #Revisar esto
+      command: > 
         bash -c "
           until cqlsh cassandra -e 'DESCRIBE KEYSPACES' > /dev/null 2>&1; do
             echo 'Esperando a Cassandra...'
@@ -114,6 +114,11 @@ services:
         PROJECT_HOME: /app
         CASSANDRA_HOST: cassandra
         KAFKA_HOST: kafka
+        MINIO_ENDPOINT: http://minio:9000
+        AWS_ACCESS_KEY_ID: minioadmin
+        AWS_SECRET_ACCESS_KEY: minioadmin
+        MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+        MLFLOW_TRACKING_URI: http://mlflow:5000
       volumes:
         - ./data:/app/data
         - ./models:/app/models
@@ -159,6 +164,12 @@ services:
       entrypoint: /opt/spark/bin/spark-submit
       command: >
         --master spark://spark-master:7077
+        --conf spark.cassandra.connection.host=cassandra
+        --conf spark.hadoop.fs.s3a.endpoint=http://minio:9000
+        --conf spark.hadoop.fs.s3a.access.key=minioadmin
+        --conf spark.hadoop.fs.s3a.secret.key=minioadmin
+        --conf spark.hadoop.fs.s3a.path.style.access=true
+        --conf spark.hadoop.fs.s3a.impl=org.apache.hadoop.fs.s3a.S3AFileSystem
         --class es.upm.dit.ging.predictor.MakePrediction
         /app/flight_prediction-assembly-0.1.jar
       environment:
