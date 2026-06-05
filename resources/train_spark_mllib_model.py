@@ -48,11 +48,13 @@ def main(base_path):
   # Configurar MLflow — usa la URL del servicio mlflow si está disponible,
   # si no, guarda los experimentos en local
   mlflow_uri = os.environ.get("MLFLOW_TRACKING_URI", "http://mlflow:5000")
+  os.environ["MLFLOW_S3_ENDPOINT_URL"] = os.environ.get("MLFLOW_S3_ENDPOINT_URL", "http://minio:9000")
+  os.environ["AWS_ACCESS_KEY_ID"] = os.environ.get("AWS_ACCESS_KEY_ID", "minioadmin")
+  os.environ["AWS_SECRET_ACCESS_KEY"] = os.environ.get("AWS_SECRET_ACCESS_KEY", "minioadmin")
   try:
     mlflow.set_tracking_uri(mlflow_uri)
     mlflow.set_experiment("flight_delay_prediction")
   except Exception:
-    # Si MLflow no está disponible, continúa sin tracking
     pass
 
   #
@@ -211,7 +213,7 @@ def main(base_path):
 
     # Registrar métricas y modelo en MLflow
     mlflow.log_metric("accuracy", accuracy)
-    #mlflow.spark.log_model(model, "random_forest_model")
+    mlflow.spark.log_model(model, "random_forest_model")
 
     # Check the distribution of predictions
     predictions.groupBy("Prediction").count().show()
