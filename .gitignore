@@ -44,3 +44,11 @@ venv/
 
 # k8s password
 k8s/secrets/
+flight_prediction/target/
+flight_prediction/sbt.tgz
+data/
+models/
+*.bz2
+__pycache__/
+*.pyc
+.env
