@@ -137,4 +137,6 @@ docker compose exec airflow-webserver airflow dags trigger flight_delay_training
 | MinIO Console | http://localhost:9001 | minioadmin / minioadmin |
 | Prometheus | http://localhost:9090 | — |
 | Grafana | http://localhost:3000 | admin / admin |
+|Airflow | http://localhost:8081  |admin / admin|
+|MLflow | http://localhost:5000|
 
